@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Vue Example</title>
+  <script src="../dist/vue.js"></script>
+</head>
+<body>
+  <div id="app">
+    <h1>{{ reversedMessage }}</h1>
+    <input v-model="message" type="text">
+    <p>Original Message: {{ originalMessage }}</p>
+    <button @click="changeMessage">Change Message</button>
+    <my-component :prop-message="message"></my-component>
+  </div>
+
+  <script>
+    // 子组件
+    Vue.component('my-component', {
+      props: ['propMessage'],
+      template: '<p>Prop Message: {{ propMessage }}</p>'
+    });
+    //
+    debugger
+    // 创建 Vue 实例
+    new Vue({
+      el: '#app',
+      data: {
+        message: 'Hello, Vue!'
+      },
+      computed: {
+        reversedMessage() {
+          return this.message.split('').reverse().join('');
+        },
+        originalMessage() {
+          return this.message;
+        }
+      },
+      watch: {
+        message(newValue, oldValue) {
+          console.log('Message changed from', oldValue, 'to', newValue);
+        }
+      },
+      filters: {
+        capitalize(value) {
+          if (!value) return '';
+          return value.charAt(0).toUpperCase() + value.slice(1);
+        }
+      },
+      methods: {
+        changeMessage() {
+          this.message = 'New message!';
+        }
+      }
+    });
+  </script>
+</body>
+</html>
