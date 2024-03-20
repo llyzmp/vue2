@@ -4,6 +4,8 @@ import { isServerRendering } from 'core/util/env'
 import { FunctionalRenderContext } from 'core/vdom/create-functional-component'
 import { version } from 'v3'
 
+// 查看全局api注册
+// debugger
 initGlobalAPI(Vue)
 
 Object.defineProperty(Vue.prototype, '$isServer', {
