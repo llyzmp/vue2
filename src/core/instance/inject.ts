@@ -27,10 +27,18 @@ export function initProvide(vm: Component) {
   }
 }
 
+/**
+ *
+ * @param vm 初始化inject配置项
+ * 得到result[key] = val
+ * 对结果进行响应式处理，将key挂载到vm实例上
+ */
 export function initInjections(vm: Component) {
+  // 解析inject选项，从祖代配置中找到每一个key对应的val,得到result[key] = val的结果
   const result = resolveInject(vm.$options.inject, vm)
   if (result) {
     toggleObserving(false)
+    // 对结果进行响应式处理，将key挂载到vm实例上
     Object.keys(result).forEach(key => {
       /* istanbul ignore else */
       if (__DEV__) {
@@ -49,7 +57,14 @@ export function initInjections(vm: Component) {
     toggleObserving(true)
   }
 }
-
+/**
+ * 解析inject配置项，从祖代的provide中找到对应key的值，得到result[key] = val
+ * inject = {
+ *  key: {
+ *    from: provideKey,
+ *    default: xx
+ *  }
+ */
 export function resolveInject(
   inject: any,
   vm: Component

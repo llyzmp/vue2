@@ -16,6 +16,7 @@ function Vue(options) {
 }
 
 //@ts-expect-error Vue has function type
+// 定义Vue.prototype._init方法
 initMixin(Vue)
 //@ts-expect-error Vue has function type
 stateMixin(Vue)

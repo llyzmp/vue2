@@ -14,7 +14,7 @@ export function provide<T>(key: InjectionKey<T> | string | number, value: T) {
     resolveProvided(currentInstance)[key as string] = value
   }
 }
-
+// 解析组件中配置项的provide选项，将其挂载到vm._provided选项上
 export function resolveProvided(vm: Component): Record<string, any> {
   // by default an instance inherits its parent's provides object
   // but when it needs to provide values of its own, it creates its
