@@ -27,6 +27,9 @@ export interface DepTarget extends DebuggerOptions {
  * A dep is an observable that can have multiple
  * directives subscribing to it.
  * @internal
+ * 一个dep对应一个obj.key
+ * 在读取响应式数据时，负责收集依赖，每个dep依赖的watcher有哪些
+ * 在响应式数据更新时，负责通知dep中那些watcher去执行update方法
  */
 export default class Dep {
   static target?: DepTarget | null
@@ -39,7 +42,7 @@ export default class Dep {
     this.id = uid++
     this.subs = []
   }
-
+  // 在dep中添加watcher
   addSub(sub: DepTarget) {
     this.subs.push(sub)
   }
@@ -77,6 +80,7 @@ export default class Dep {
       // order
       subs.sort((a, b) => a.id - b.id)
     }
+    // 遍历dep中存储的watcher，执行update()进行更新
     for (let i = 0, l = subs.length; i < l; i++) {
       const sub = subs[i]
       if (__DEV__ && info) {

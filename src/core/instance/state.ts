@@ -64,12 +64,15 @@ export function initState(vm: Component) {
   // 处理methods，校验是否为函数，并且是否和props中的key重复，处理结果vm[key] = methods[key]
   if (opts.methods) initMethods(vm, opts.methods)
   if (opts.data) {
+    // 初始化data
     initData(vm)
   } else {
     const ob = observe((vm._data = {}))
     ob && ob.vmCount++
   }
+  // 初始化计算属性
   if (opts.computed) initComputed(vm, opts.computed)
+  // 初始化watch
   if (opts.watch && opts.watch !== nativeWatch) {
     initWatch(vm, opts.watch)
   }
@@ -173,6 +176,7 @@ function initData(vm: Component) {
     }
   }
   // observe data
+  // data中的key变为响应式，并添加到vm实例上
   const ob = observe(data)
   ob && ob.vmCount++
 }

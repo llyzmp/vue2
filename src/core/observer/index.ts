@@ -44,6 +44,8 @@ const mockDep = {
  * object. Once attached, the observer converts the target
  * object's property keys into getter/setters that
  * collect dependencies and dispatch updates.
+ * 观察者类，会被附加到每个被观察的对象上，value.__ob__ = this
+ * 对象的每个属性都会被转化为getter/setter，并收集依赖和通知更新
  */
 export class Observer {
   dep: Dep
@@ -53,7 +55,14 @@ export class Observer {
     // this.value = value
     this.dep = mock ? mockDep : new Dep()
     this.vmCount = 0
+    // value对象上设置__ob__ = this
     def(value, '__ob__', this)
+    /**
+     * value为数组时
+     * hasProto = '__proto__' in {}
+     * 要通过__proto__操作数据的原型链，判断对象是否存在__proto__属性，通过obj.__proto__可以访问对象的原型链
+     * 覆盖数组默认的七个原型方法，以实现数组响应式
+     */
     if (isArray(value)) {
       if (!mock) {
         if (hasProto) {
@@ -75,6 +84,7 @@ export class Observer {
        * Walk through all properties and convert them into
        * getter/setters. This method should only be called when
        * value type is Object.
+       * 遍历对象上的每个key,为其设置为响应式的
        */
       const keys = Object.keys(value)
       for (let i = 0; i < keys.length; i++) {
@@ -86,6 +96,7 @@ export class Observer {
 
   /**
    * Observe a list of Array items.
+   * 遍历数组，为数组的每一项设置观察
    */
   observeArray(value: any[]) {
     for (let i = 0, l = value.length; i < l; i++) {
@@ -100,6 +111,8 @@ export class Observer {
  * Attempt to create an observer instance for a value,
  * returns the new observer if successfully observed,
  * or the existing observer if the value already has one.
+ * 响应式处理的入口，为对象创建观察者，如果对象被观察过了，则直接返回观察者的实例，否则创建新的观察者实例
+ * value 对象 => {}
  */
 export function observe(
   value: any,
@@ -107,6 +120,7 @@ export function observe(
   ssrMockReactivity?: boolean
 ): Observer | void {
   if (value && hasOwn(value, '__ob__') && value.__ob__ instanceof Observer) {
+    // 如果value对象上存在__ob__属性，则表示已经观察过了，直接返回__ob__属性
     return value.__ob__
   }
   if (
@@ -118,12 +132,16 @@ export function observe(
     !isRef(value) &&
     !(value instanceof VNode)
   ) {
+    // 创建观察者实例
     return new Observer(value, shallow, ssrMockReactivity)
   }
 }
 
 /**
  * Define a reactive property on an Object.
+ * 拦截obj[key]的读取和设置操作
+ * 第一次读取时收集依赖，render函数生成虚拟DOM时会有读取操作，在更新时设置新值并通知依赖更新
+ *
  */
 export function defineReactive(
   obj: object,
@@ -134,14 +152,16 @@ export function defineReactive(
   mock?: boolean,
   observeEvenIfShallow = false
 ) {
+  // 实例化dep, 一个key一个dep
   const dep = new Dep()
-
+  // 查看key是否可配置，不可配置直接return
   const property = Object.getOwnPropertyDescriptor(obj, key)
   if (property && property.configurable === false) {
     return
   }
 
   // cater for pre-defined getter/setters
+  // 记录getter和setter，获取val
   const getter = property && property.get
   const setter = property && property.set
   if (
@@ -150,14 +170,21 @@ export function defineReactive(
   ) {
     val = obj[key]
   }
-
+  // 递归处理，保证所有的key都被观察
   let childOb = shallow ? val && val.__ob__ : observe(val, false, mock)
   Object.defineProperty(obj, key, {
     enumerable: true,
     configurable: true,
     get: function reactiveGetter() {
       const value = getter ? getter.call(obj) : val
+      /**
+       * Dep.target是Dep类的一个静态属性，值为watcher, 在实例化Watcher时会被设置
+       * 实例化Watcher时会执行new Watcher时传递的回调函数（computed除外，这个是懒执行）
+       * 回调函数中如果有vm.key的读取行为，则会出发这里的读取拦截，进行依赖收集，
+       * 回调函数执行完以后会将Dep.target设置为null,避免重复收集依赖
+       */
       if (Dep.target) {
+        // 收集依赖,在dep中添加watcher,也在watcher中添加dep
         if (__DEV__) {
           dep.depend({
             target: obj,
@@ -167,16 +194,22 @@ export function defineReactive(
         } else {
           dep.depend()
         }
+        // childOb表示对象中嵌套对象的观察者对象，如果存在也对其进行依赖收集
         if (childOb) {
+          // 这就是this.key.childKey被更新时能触发响应式更新的原因
           childOb.dep.depend()
+          // 如果obj[key]是数组，则触发数组响应式
           if (isArray(value)) {
+            // 为数组项对象的项添加依赖
             dependArray(value)
           }
         }
       }
       return isRef(value) && !shallow ? value.value : value
     },
+    // set拦截对obj[key]的设置操作
     set: function reactiveSetter(newVal) {
+      // 旧的obj[key]
       const value = getter ? getter.call(obj) : val
       if (!hasChanged(value, newVal)) {
         return
@@ -185,6 +218,7 @@ export function defineReactive(
         customSetter()
       }
       if (setter) {
+        // 设置新值
         setter.call(obj, newVal)
       } else if (getter) {
         // #7981: for accessor properties without setter
@@ -195,7 +229,9 @@ export function defineReactive(
       } else {
         val = newVal
       }
+      // 对新值进行观察，新值也是响应式的
       childOb = shallow ? newVal && newVal.__ob__ : observe(newVal, false, mock)
+      // 依赖通知更新
       if (__DEV__) {
         dep.notify({
           type: TriggerOpTypes.SET,
@@ -325,6 +361,7 @@ export function del(target: any[] | object, key: any) {
 /**
  * Collect dependencies on array elements when the array is touched, since
  * we cannot intercept array element access like property getters.
+ * 遍历每个数组元素，递归处理数组项为对象的情况，为其添加依赖，前面阶段递归阶段无法为数组中的对象元素添加依赖
  */
 function dependArray(value: Array<any>) {
   for (let e, i = 0, l = value.length; i < l; i++) {

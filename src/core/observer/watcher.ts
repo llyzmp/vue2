@@ -36,6 +36,8 @@ export interface WatcherOptions extends DebuggerOptions {
  * A watcher parses an expression, collects dependencies,
  * and fires callback when the expression value changes.
  * This is used for both the $watch() api and directives.
+ * 一个组件一个watcher(渲染watcher)或者一个表达式一个watcher(用户watcher)
+ * 当数据更新时watcher会被触发，访问计算属性也会触发watcher
  * @internal
  */
 export default class Watcher implements DepTarget {
@@ -109,6 +111,8 @@ export default class Watcher implements DepTarget {
     this.newDepIds = new Set()
     this.expression = __DEV__ ? expOrFn.toString() : ''
     // parse expression for getter
+    // 在this.get中执行this.getter时会触发依赖收集
+    // 待后续this.xx更新时会触发响应式
     if (isFunction(expOrFn)) {
       this.getter = expOrFn
     } else {
@@ -129,12 +133,17 @@ export default class Watcher implements DepTarget {
 
   /**
    * Evaluate the getter, and re-collect dependencies.
+   * 执行this.getter，重新收集依赖
+   * this.getter是实例化watcher时传递的第二个参数，一个是函数或字符串，如updateComponent,或者parsePath
+   * 由于触发更新说明响应式数据被更新了，被更新的数据已经被Observe观察了，但没有收集依赖
+   * 在页面更新时，会重新执行一次render函数，执行期间触发读取操作，进行依赖收集
    */
   get() {
     pushTarget(this)
     let value
     const vm = this.vm
     try {
+      // 执行回调函数，updateComponent,进入patch阶段
       value = this.getter.call(vm, vm)
     } catch (e: any) {
       if (this.user) {
@@ -156,6 +165,8 @@ export default class Watcher implements DepTarget {
 
   /**
    * Add a dependency to this directive.
+   * 添加dep给watcher自己
+   * 添加watcher给dep
    */
   addDep(dep: Dep) {
     const id = dep.id
@@ -192,14 +203,22 @@ export default class Watcher implements DepTarget {
   /**
    * Subscriber interface.
    * Will be called when a dependency changes.
+   * 根据watcher配置项，走哪一步，一般是queueWatcher
    */
   update() {
     /* istanbul ignore else */
     if (this.lazy) {
+      // computed的懒执行走这里
       this.dirty = true
     } else if (this.sync) {
+      /**
+       * 同步执行，使用vm.$watch或者使用watch选项可以传一个sync参数
+       * 为true时在更新该watcher时不走一步更新队列，直接this.run进行更新
+       *
+       */
       this.run()
     } else {
+      // 更新时一般都在这里，将watcher放入watcher队列
       queueWatcher(this)
     }
   }
@@ -219,6 +238,7 @@ export default class Watcher implements DepTarget {
         isObject(value) ||
         this.deep
       ) {
+        // 更新旧值为新值
         // set new value
         const oldValue = this.value
         this.value = value
